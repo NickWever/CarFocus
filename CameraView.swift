@@ -129,6 +129,18 @@ struct CameraView: UIViewControllerRepresentable {
                 }
             }
         }
+
+        @objc func adjustExposure(_ sender: UISlider) {
+            if let device = AVCaptureDevice.default(for: .video) {
+                do {
+                    try device.lockForConfiguration()
+                    device.setExposureTargetBias(sender.value, completionHandler: nil)
+                    device.unlockForConfiguration()
+                } catch {
+                    print("❌ Error adjusting exposure: \(error)")
+                }
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -154,6 +166,13 @@ struct CameraView: UIViewControllerRepresentable {
         flashButton.addTarget(context.coordinator, action: #selector(Coordinator.toggleFlash), for: .touchUpInside)
         viewController.view.addSubview(flashButton)
 
+        let exposureSlider = UISlider()
+        exposureSlider.minimumValue = -2.0
+        exposureSlider.maximumValue = 2.0
+        exposureSlider.translatesAutoresizingMaskIntoConstraints = false
+        exposureSlider.addTarget(context.coordinator, action: #selector(Coordinator.adjustExposure(_:)), for: .valueChanged)
+        viewController.view.addSubview(exposureSlider)
+
         let fotoNaamLabel = UILabel()
         fotoNaamLabel.text = huidigeFotoNaam
         fotoNaamLabel.textAlignment = .center
@@ -174,6 +193,11 @@ struct CameraView: UIViewControllerRepresentable {
             flashButton.heightAnchor.constraint(equalToConstant: 40),
             flashButton.trailingAnchor.constraint(equalTo: viewController.view.trailingAnchor, constant: -20),
             flashButton.topAnchor.constraint(equalTo: viewController.view.safeAreaLayoutGuide.topAnchor, constant: 20),
+
+            // Belichtingsschuif
+            exposureSlider.leadingAnchor.constraint(equalTo: viewController.view.leadingAnchor, constant: 20),
+            exposureSlider.trailingAnchor.constraint(equalTo: viewController.view.trailingAnchor, constant: -20),
+            exposureSlider.bottomAnchor.constraint(equalTo: captureButton.topAnchor, constant: -20),
 
             // Naam van de te nemen foto
             fotoNaamLabel.centerXAnchor.constraint(equalTo: viewController.view.centerXAnchor),
