@@ -18,7 +18,6 @@ struct CameraView: UIViewControllerRepresentable {
             self.parent = parent
             super.init()
 
-            // Observer voor apparaat-oriëntatie
             NotificationCenter.default.addObserver(
                 self,
                 selector: #selector(deviceOrientationDidChange),
@@ -37,7 +36,6 @@ struct CameraView: UIViewControllerRepresentable {
 
             captureSession.beginConfiguration()
 
-            // Configure video input
             guard let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
                   let videoInput = try? AVCaptureDeviceInput(device: videoDevice),
                   captureSession.canAddInput(videoInput) else {
@@ -46,7 +44,6 @@ struct CameraView: UIViewControllerRepresentable {
             }
             captureSession.addInput(videoInput)
 
-            // Configure photo output
             photoOutput = AVCapturePhotoOutput()
             guard let photoOutput = photoOutput, captureSession.canAddOutput(photoOutput) else {
                 print("❌ Error: Cannot configure photo output.")
@@ -54,7 +51,6 @@ struct CameraView: UIViewControllerRepresentable {
             }
             captureSession.addOutput(photoOutput)
 
-            // Configure preview layer
             previewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
             previewLayer?.videoGravity = .resizeAspectFill
             previewLayer?.frame = view.bounds
@@ -64,7 +60,6 @@ struct CameraView: UIViewControllerRepresentable {
                 }
             }
 
-            // Update oriëntatie van de preview layer
             updatePreviewOrientation()
 
             captureSession.commitConfiguration()
@@ -84,8 +79,6 @@ struct CameraView: UIViewControllerRepresentable {
                 if UIDevice.current.orientation.isLandscape || UIDevice.current.orientation.isPortrait {
                     connection.videoOrientation = UIDevice.current.orientation.videoOrientation
                 }
-
-                // Update de frame van de preview layer
                 self.previewLayer?.frame = UIScreen.main.bounds
             }
         }
@@ -110,11 +103,13 @@ struct CameraView: UIViewControllerRepresentable {
                 return
             }
 
-            // Fix oriëntatie van de afbeelding
             let fixedImage = image.fixedOrientation()
             DispatchQueue.main.async {
                 self.parent.geselecteerdeFoto = fixedImage
                 self.parent.voltooiFoto(fixedImage)
+                
+                // Update the photo name
+                self.parent.huidigeFotoNaam = "Foto_\(UUID().uuidString).jpg"
             }
         }
 
@@ -182,24 +177,20 @@ struct CameraView: UIViewControllerRepresentable {
         viewController.view.addSubview(fotoNaamLabel)
 
         NSLayoutConstraint.activate([
-            // Foto maken knop
             captureButton.widthAnchor.constraint(equalToConstant: 70),
             captureButton.heightAnchor.constraint(equalToConstant: 70),
             captureButton.bottomAnchor.constraint(equalTo: viewController.view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
             captureButton.centerXAnchor.constraint(equalTo: viewController.view.centerXAnchor),
 
-            // Flitsknop
             flashButton.widthAnchor.constraint(equalToConstant: 40),
             flashButton.heightAnchor.constraint(equalToConstant: 40),
             flashButton.trailingAnchor.constraint(equalTo: viewController.view.trailingAnchor, constant: -20),
             flashButton.topAnchor.constraint(equalTo: viewController.view.safeAreaLayoutGuide.topAnchor, constant: 20),
 
-            // Belichtingsschuif
             exposureSlider.leadingAnchor.constraint(equalTo: viewController.view.leadingAnchor, constant: 20),
             exposureSlider.trailingAnchor.constraint(equalTo: viewController.view.trailingAnchor, constant: -20),
             exposureSlider.bottomAnchor.constraint(equalTo: captureButton.topAnchor, constant: -20),
 
-            // Naam van de te nemen foto
             fotoNaamLabel.centerXAnchor.constraint(equalTo: viewController.view.centerXAnchor),
             fotoNaamLabel.topAnchor.constraint(equalTo: viewController.view.safeAreaLayoutGuide.topAnchor, constant: 20)
         ])
@@ -214,10 +205,10 @@ extension UIDeviceOrientation {
     var videoOrientation: AVCaptureVideoOrientation {
         switch self {
         case .portrait: return .portrait
-        case .landscapeLeft: return .landscapeRight // Omgekeerde mapping voor correcte oriëntatie
+        case .landscapeLeft: return .landscapeRight
         case .landscapeRight: return .landscapeLeft
         case .portraitUpsideDown: return .portraitUpsideDown
-        default: return .portrait // Standaard naar portrait
+        default: return .portrait
         }
     }
 }
