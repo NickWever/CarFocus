@@ -13,6 +13,9 @@ struct CameraView: UIViewControllerRepresentable {
         var captureSession: AVCaptureSession?
         var photoOutput: AVCapturePhotoOutput?
         var previewLayer: AVCaptureVideoPreviewLayer?
+        var frontCameraInput: AVCaptureDeviceInput?
+        var backCameraInput: AVCaptureDeviceInput?
+        var currentCameraPosition: CameraPosition = .back
 
         init(parent: CameraView) {
             self.parent = parent
@@ -43,6 +46,7 @@ struct CameraView: UIViewControllerRepresentable {
                 return
             }
             captureSession.addInput(videoInput)
+            backCameraInput = videoInput
 
             photoOutput = AVCapturePhotoOutput()
             guard let photoOutput = photoOutput, captureSession.canAddOutput(photoOutput) else {
@@ -74,19 +78,19 @@ struct CameraView: UIViewControllerRepresentable {
 
         func updatePreviewOrientation() {
             guard let connection = previewLayer?.connection else { return }
-            guard connection.isVideoOrientationSupported else { return }
+            guard connection.isVideoRotationAngleSupported else { return }
 
             switch UIDevice.current.orientation {
             case .portrait:
-                connection.videoOrientation = .portrait
+                connection.videoRotationAngle = 0
             case .landscapeLeft:
-                connection.videoOrientation = .landscapeRight
+                connection.videoRotationAngle = 90
             case .landscapeRight:
-                connection.videoOrientation = .landscapeLeft
+                connection.videoRotationAngle = -90
             case .portraitUpsideDown:
-                connection.videoOrientation = .portraitUpsideDown
+                connection.videoRotationAngle = 180
             default:
-                connection.videoOrientation = .portrait
+                connection.videoRotationAngle = 0
             }
 
             DispatchQueue.main.async {
@@ -135,7 +139,6 @@ struct CameraView: UIViewControllerRepresentable {
                 }
             }
         }
-
         @objc func adjustExposure(_ sender: UISlider) {
             if let device = AVCaptureDevice.default(for: .video) {
                 do {
@@ -146,6 +149,30 @@ struct CameraView: UIViewControllerRepresentable {
                     print("❌ Error adjusting exposure: \(error)")
                 }
             }
+        }
+
+        @objc func switchCamera() {
+            guard let captureSession = captureSession else { return }
+            captureSession.beginConfiguration()
+
+            if currentCameraPosition == .back {
+                guard let frontCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front),
+                      let frontInput = try? AVCaptureDeviceInput(device: frontCamera),
+                      captureSession.canAddInput(frontInput) else {
+                    print("❌ Error: Cannot switch to front camera.")
+                    return
+                }
+                captureSession.removeInput(backCameraInput!)
+                captureSession.addInput(frontInput)
+                frontCameraInput = frontInput
+                currentCameraPosition = .front
+            } else {
+                captureSession.removeInput(frontCameraInput!)
+                captureSession.addInput(backCameraInput!)
+                currentCameraPosition = .back
+            }
+
+            captureSession.commitConfiguration()
         }
     }
 
@@ -172,6 +199,14 @@ struct CameraView: UIViewControllerRepresentable {
         flashButton.addTarget(context.coordinator, action: #selector(Coordinator.toggleFlash), for: .touchUpInside)
         viewController.view.addSubview(flashButton)
 
+        let switchButton = UIButton()
+        switchButton.setImage(UIImage(systemName: "camera.rotate"), for: .normal)
+        switchButton.backgroundColor = .gray
+        switchButton.layer.cornerRadius = 20
+        switchButton.translatesAutoresizingMaskIntoConstraints = false
+        switchButton.addTarget(context.coordinator, action: #selector(Coordinator.switchCamera), for: .touchUpInside)
+        viewController.view.addSubview(switchButton)
+
         let exposureSlider = UISlider()
         exposureSlider.minimumValue = -2.0
         exposureSlider.maximumValue = 2.0
@@ -197,6 +232,11 @@ struct CameraView: UIViewControllerRepresentable {
             flashButton.heightAnchor.constraint(equalToConstant: 40),
             flashButton.trailingAnchor.constraint(equalTo: viewController.view.trailingAnchor, constant: -20),
             flashButton.topAnchor.constraint(equalTo: viewController.view.safeAreaLayoutGuide.topAnchor, constant: 20),
+            
+            switchButton.widthAnchor.constraint(equalToConstant: 40),
+            switchButton.heightAnchor.constraint(equalToConstant: 40),
+            switchButton.leadingAnchor.constraint(equalTo: viewController.view.leadingAnchor, constant: -20),
+            switchButton.topAnchor.constraint(equalTo: viewController.view.safeAreaLayoutGuide.topAnchor, constant: 20),
 
             exposureSlider.leadingAnchor.constraint(equalTo: viewController.view.leadingAnchor, constant: 20),
             exposureSlider.trailingAnchor.constraint(equalTo: viewController.view.trailingAnchor, constant: -20),
@@ -217,7 +257,7 @@ struct CameraView: UIViewControllerRepresentable {
 }
 
 extension UIDeviceOrientation {
-    var videoRotationAngle: CGFloat {
+    var rotationAngle: CGFloat {
         switch self {
         case .portrait: return 0
         case .landscapeLeft: return 90
@@ -226,6 +266,7 @@ extension UIDeviceOrientation {
         default: return 0
         }
     }
+}
 
     var videoOrientation: AVCaptureVideoOrientation? {
         switch self {
@@ -236,7 +277,7 @@ extension UIDeviceOrientation {
         default: return nil
         }
     }
-}
+
 
 extension UIImage {
     func fixedOrientation() -> UIImage {
@@ -249,3 +290,9 @@ extension UIImage {
         return normalizedImage
     }
 }
+
+enum CameraPosition {
+    case front
+    case back
+}
+
