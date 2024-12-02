@@ -109,19 +109,19 @@ struct CameraView: UIViewControllerRepresentable {
 
         func updatePreviewOrientation() {
             guard let connection = previewLayer?.connection else { return }
-            guard connection.isVideoRotationAngleSupported else { return }
+            guard connection.isVideoOrientationSupported else { return }
 
             switch UIDevice.current.orientation {
             case .portrait:
-                connection.videoRotationAngle = 0
+                connection.videoOrientation = .portrait
             case .landscapeLeft:
-                connection.videoRotationAngle = 90
+                connection.videoOrientation = .landscapeRight
             case .landscapeRight:
-                connection.videoRotationAngle = -90
+                connection.videoOrientation = .landscapeLeft
             case .portraitUpsideDown:
-                connection.videoRotationAngle = 180
+                connection.videoOrientation = .portraitUpsideDown
             default:
-                connection.videoRotationAngle = 0
+                connection.videoOrientation = .portrait
             }
 
             DispatchQueue.main.async {
@@ -194,13 +194,19 @@ struct CameraView: UIViewControllerRepresentable {
                     print("❌ Error: Cannot switch to front camera.")
                     return
                 }
-                captureSession.removeInput(backCameraInput!)
+                if let backCameraInput = backCameraInput {
+                    captureSession.removeInput(backCameraInput)
+                }
                 captureSession.addInput(frontInput)
                 frontCameraInput = frontInput
                 currentCameraPosition = .front
             } else {
-                captureSession.removeInput(frontCameraInput!)
-                captureSession.addInput(backCameraInput!)
+                if let frontCameraInput = frontCameraInput {
+                    captureSession.removeInput(frontCameraInput)
+                }
+                if let backCameraInput = backCameraInput {
+                    captureSession.addInput(backCameraInput)
+                }
                 currentCameraPosition = .back
             }
 
@@ -300,3 +306,4 @@ extension UIImage {
         return normalizedImage
     }
 }
+
