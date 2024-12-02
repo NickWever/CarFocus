@@ -1,9 +1,3 @@
-//
-//  CameraController.swift
-//  CarFocus
-//
-//  Created by Nick Wever on 02/12/2024.
-//
 import SwiftUI
 import AVFoundation
 
@@ -47,7 +41,11 @@ struct CameraInputView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
-        cameraManager.setup(in: view)
+        do {
+            try cameraManager.setup(in: view)
+        } catch {
+            print("Error setting up camera: \(error)")
+        }
         return view
     }
 
