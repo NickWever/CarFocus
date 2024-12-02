@@ -81,7 +81,7 @@ class CameraManager: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
 
         startCaptureSession()
         announceSetupCompletion()
-        initialiseCameraGridView()
+        initialiseCameraGridView(cameraView)
     }
 
     func initialiseCaptureSession() {
@@ -161,9 +161,9 @@ class CameraManager: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
         captureSession.addOutput(output)
     }
     
-    func initialiseCameraGridView() {
+    func initialiseCameraGridView(_ cameraView: UIView) {
         cameraGridView = .init()
-        cameraGridView.addAsSubview(to: cameraLayer.superlayer?.superlayer)
+        cameraGridView.addAsSubview(to: cameraView)
         cameraGridView.alpha = isGridVisible ? 1 : 0
     }
 
@@ -262,22 +262,50 @@ class CameraManager: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
         case cannotSetupOutput
         case cameraPermissionsNotGranted
     }
-}
-func checkPermissions() throws {
-    let status = AVCaptureDevice.authorizationStatus(for: .video)
-    switch status {
-    case .authorized:
-        return
-    case .notDetermined:
-        AVCaptureDevice.requestAccess(for: .video) { granted in
-            if !granted {
-                throw CameraManager.Error.cameraPermissionsNotGranted
+
+    func checkPermissions() throws {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        switch status {
+        case .authorized:
+            return
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                if !granted {
+                    // Handle the error without throwing
+                    DispatchQueue.main.async {
+                        self.handlePermissionError()
+                    }
+                }
             }
+        default:
+            throw CameraManager.Error.cameraPermissionsNotGranted
         }
-    default:
-        throw CameraManager.Error.cameraPermissionsNotGranted
+    }
+
+    private func handlePermissionError() {
+        // Handle the permission error appropriately
+    }
+    func configureOutput(_ output: AVCapturePhotoOutput?) {
+        // Add any necessary configuration for the photo output
+        if #available(iOS 16.0, *) {
+            output?.maxPhotoDimensions = .init(width: 4032, height: 3024)
+        } else {
+            output?.isHighResolutionCaptureEnabled = true
+        }
+    }
+
+    enum CameraOutputType {
+        case photo
+    }
+
+    func getOutput(_ outputType: CameraOutputType) -> AVCaptureOutput? {
+        switch outputType {
+        case .photo:
+            return photoOutput
+        }
     }
 }
+
 // UIDeviceOrientation extensions
 extension UIDeviceOrientation {
     var rotationAngle: CGFloat {
@@ -370,4 +398,3 @@ private extension GridView {
         return shapeLayer
     }
 }
-
