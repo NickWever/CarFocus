@@ -13,6 +13,7 @@ struct CameraView: UIViewControllerRepresentable {
         var captureSession: AVCaptureSession?
         var photoOutput: AVCapturePhotoOutput?
         var previewLayer: AVCaptureVideoPreviewLayer?
+        var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
 
         init(parent: CameraView) {
             self.parent = parent
@@ -60,7 +61,15 @@ struct CameraView: UIViewControllerRepresentable {
                 }
             }
 
-            updatePreviewOrientation()
+            // Update rotation coordinator
+            rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: videoDevice, previewLayer: previewLayer!)
+            rotationCoordinator?.observe(\.videoRotationAngleForHorizonLevelPreview, options: [.initial, .new]) { _, change in
+                if let angle = change.newValue {
+                    DispatchQueue.main.async {
+                        self.previewLayer?.connection?.videoRotationAngle = angle
+                    }
+                }
+            }
 
             captureSession.commitConfiguration()
             DispatchQueue.global(qos: .userInitiated).async {
@@ -77,7 +86,7 @@ struct CameraView: UIViewControllerRepresentable {
 
             DispatchQueue.main.async {
                 if UIDevice.current.orientation.isLandscape || UIDevice.current.orientation.isPortrait {
-                    connection.videoOrientation = UIDevice.current.orientation.videoOrientation
+                    connection.videoRotationAngle = UIDevice.current.orientation.videoRotationAngle
                 }
                 self.previewLayer?.frame = UIScreen.main.bounds
             }
@@ -202,13 +211,13 @@ struct CameraView: UIViewControllerRepresentable {
 }
 
 extension UIDeviceOrientation {
-    var videoOrientation: AVCaptureVideoOrientation {
+    var videoRotationAngle: CGFloat {
         switch self {
-        case .portrait: return .portrait
-        case .landscapeLeft: return .landscapeRight
-        case .landscapeRight: return .landscapeLeft
-        case .portraitUpsideDown: return .portraitUpsideDown
-        default: return .portrait
+        case .portrait: return 0
+        case .landscapeLeft: return 90
+        case .landscapeRight: return -90
+        case .portraitUpsideDown: return 180
+        default: return 0
         }
     }
 }
