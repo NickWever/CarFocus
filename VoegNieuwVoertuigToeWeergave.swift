@@ -20,6 +20,8 @@ struct VoegNieuwVoertuigToeWeergave: View {
     @State private var geselecteerdeFoto: UIImage? = nil
     @State private var isCameraActive = false
     @State private var makenVanExtraFoto = false
+    @State private var toonGroteFoto = false
+    @State private var geselecteerdeFotoPad: IdentifiableString?
 
     // Foutmeldingen
     @State private var foutmelding = ""
@@ -58,8 +60,9 @@ struct VoegNieuwVoertuigToeWeergave: View {
                 huidigeFotoNaam: Binding(get: { huidigeFotoNaam() }, set: { _ in })
             )
         }
-
-
+        .fullScreenCover(item: $geselecteerdeFotoPad) { fotoPad in
+            GroteFotoView(fotoPad: fotoPad.value)
+        }
         .onAppear {
             laadFotoVolgorde()
             if voertuigFolderPath == nil {
@@ -88,8 +91,9 @@ struct VoegNieuwVoertuigToeWeergave: View {
             foutmelding = "Geen folderpad beschikbaar voor het voertuig"
             return
         }
+        let fixedFoto = foto.fixedOrientation() // Ensure the photo is correctly oriented
         let fotoNaam = "\(UUID().uuidString).jpg"
-        FileManagerHelper.shared.slaFotoOpInMap(image: foto, naam: fotoNaam, folderPath: folderPath) { fotoPad in
+        FileManagerHelper.shared.slaFotoOpInMap(image: fixedFoto, naam: fotoNaam, folderPath: folderPath) { fotoPad in
             if let fotoPad = fotoPad {
                 fotosOpgeslagen.append(fotoPad)
                 geselecteerdeFoto = nil
@@ -98,7 +102,6 @@ struct VoegNieuwVoertuigToeWeergave: View {
             }
         }
     }
-
     func laadFotoVolgorde() {
         fotoLijst = UserDefaults.standard.object(forKey: "fotoLijstNieuweVoertuigen") as? [String] ?? ["Voorkant", "Achterkant", "Interieur"]
     }
@@ -186,11 +189,15 @@ struct VoegNieuwVoertuigToeWeergave: View {
                     ForEach(fotosOpgeslagen, id: \.self) { fotoPad in
                         VStack {
                             if let image = FileManagerHelper.shared.loadImage(atPath: fotoPad) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 100, height: 100)
-                                    .cornerRadius(10)
+                                Button(action: {
+                                    geselecteerdeFotoPad = IdentifiableString(value: fotoPad)
+                                }) {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 100, height: 100)
+                                        .cornerRadius(10)
+                                }
                             } else {
                                 Text("Kan foto niet laden")
                                     .foregroundColor(.red)
@@ -239,3 +246,36 @@ struct VoegNieuwVoertuigToeWeergave: View {
     }
 }
 
+struct GroteFotoView: View {
+    var fotoPad: String
+
+    var body: some View {
+        VStack {
+            if let image = FileManagerHelper.shared.loadImage(atPath: fotoPad) {
+                GeometryReader { geometry in
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .rotationEffect(image.imageOrientation == .left || image.imageOrientation == .right ? .degrees(90) : .degrees(0))
+                        .edgesIgnoringSafeArea(.all)
+                }
+            } else {
+                Text("Kan foto niet laden")
+                    .foregroundColor(.red)
+            }
+        }
+        .background(Color.black)
+        .onTapGesture {
+            // Dismiss the full-screen view when tapped
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                windowScene.windows.first?.rootViewController?.dismiss(animated: true, completion: nil)
+            }
+        }
+    }
+}
+
+struct IdentifiableString: Identifiable {
+    let id = UUID()
+    let value: String
+}
