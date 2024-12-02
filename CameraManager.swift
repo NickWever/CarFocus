@@ -3,7 +3,7 @@ import AVFoundation
 import UIKit
 
 // CameraManager with device orientation handling
-class CameraManager: NSObject, ObservableObject {
+class CameraManager: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
     // MARK: Devices
     private var frontCamera: AVCaptureDevice?
     private var backCamera: AVCaptureDevice?
@@ -48,19 +48,19 @@ class CameraManager: NSObject, ObservableObject {
 
     func updatePreviewOrientation() {
         guard let connection = cameraLayer?.connection else { return }
-        guard connection.isVideoRotationAngleSupported else { return }
+        guard connection.isVideoOrientationSupported else { return }
 
         switch UIDevice.current.orientation {
         case .portrait:
-            connection.videoRotationAngle = 0
+            connection.videoOrientation = .portrait
         case .landscapeLeft:
-            connection.videoRotationAngle = 90
+            connection.videoOrientation = .landscapeRight
         case .landscapeRight:
-            connection.videoRotationAngle = -90
+            connection.videoOrientation = .landscapeLeft
         case .portraitUpsideDown:
-            connection.videoRotationAngle = 180
+            connection.videoOrientation = .portraitUpsideDown
         default:
-            connection.videoRotationAngle = 0
+            connection.videoOrientation = .portrait
         }
 
         DispatchQueue.main.async {
@@ -100,8 +100,12 @@ class CameraManager: NSObject, ObservableObject {
     }
 
     func initialiseInputs() {
-        frontCameraInput = try? AVCaptureDeviceInput(device: frontCamera)
-        backCameraInput = try? AVCaptureDeviceInput(device: backCamera)
+        if let frontCamera = frontCamera {
+            frontCameraInput = try? AVCaptureDeviceInput(device: frontCamera)
+        }
+        if let backCamera = backCamera {
+            backCameraInput = try? AVCaptureDeviceInput(device: backCamera)
+        }
     }
 
     func initialiseOutputs() {
@@ -144,14 +148,14 @@ class CameraManager: NSObject, ObservableObject {
     }
 
     func setupInput(_ input: AVCaptureDeviceInput?) throws {
-        guard let input, captureSession.canAddInput(input) else {
+        guard let input = input, captureSession.canAddInput(input) else {
             throw Error.cannotSetupInput
         }
         captureSession.addInput(input)
     }
 
     func setupOutput(_ output: AVCaptureOutput?) throws {
-        guard let output, captureSession.canAddOutput(output) else {
+        guard let output = output, captureSession.canAddOutput(output) else {
             throw Error.cannotSetupOutput
         }
         captureSession.addOutput(output)
@@ -159,7 +163,7 @@ class CameraManager: NSObject, ObservableObject {
     
     func initialiseCameraGridView() {
         cameraGridView = .init()
-        cameraGridView.addAsSubview(to: cameraView)
+        cameraGridView.addAsSubview(to: cameraLayer.superlayer?.superlayer)
         cameraGridView.alpha = isGridVisible ? 1 : 0
     }
 
@@ -244,13 +248,36 @@ class CameraManager: NSObject, ObservableObject {
         torchMode = value
     }
 
+    func getDevice(_ position: CameraPosition) -> AVCaptureDevice? {
+        switch position {
+        case .front:
+            return frontCamera
+        case .back:
+            return backCamera
+        }
+    }
+
     enum Error: Swift.Error {
         case cannotSetupInput
         case cannotSetupOutput
         case cameraPermissionsNotGranted
     }
 }
-
+func checkPermissions() throws {
+    let status = AVCaptureDevice.authorizationStatus(for: .video)
+    switch status {
+    case .authorized:
+        return
+    case .notDetermined:
+        AVCaptureDevice.requestAccess(for: .video) { granted in
+            if !granted {
+                throw CameraManager.Error.cameraPermissionsNotGranted
+            }
+        }
+    default:
+        throw CameraManager.Error.cameraPermissionsNotGranted
+    }
+}
 // UIDeviceOrientation extensions
 extension UIDeviceOrientation {
     var rotationAngle: CGFloat {
@@ -288,7 +315,8 @@ extension UIDeviceOrientation {
 class GridView: UIView {}
 
 extension GridView {
-    func addAsSubview(to view: UIView) {
+    func addAsSubview(to view: UIView?) {
+        guard let view = view else { return }
         translatesAutoresizingMaskIntoConstraints = false
         backgroundColor = UIColor.clear
 
@@ -340,82 +368,6 @@ private extension GridView {
         shapeLayer.frame = bounds
         shapeLayer.fillColor = nil
         return shapeLayer
-    }
-}
-
-// CameraController with integrated orientation handling
-struct CameraController: View {
-    @ObservedObject var cameraManager: CameraManager = .init()
-    @State var cameraError: CameraManager.Error?
-
-    var body: some View {
-        ZStack {
-            switch cameraError {
-            case .some(let error):
-                createErrorStateView(error)
-            case nil:
-                createCameraView()
-        }}
-        .onAppear(perform: checkCameraPermissions)
-        .onChange(of: UIDevice.current.orientation) { _ in
-            cameraManager.updatePreviewOrientation()
-        }
-    }
-}
-
-private extension CameraController {
-    func checkCameraPermissions() {
-        do {
-            try cameraManager.checkPermissions()
-        } catch {
-            cameraError = error as? CameraManager.Error
-        }
-    }
-
-    func createErrorStateView(_ error: CameraManager.Error) -> some View {
-        Text("Camera Error: \(error.localizedDescription)")
-    }
-
-    func createCameraView() -> some View {
-        CameraInputView(cameraManager)
-    }
-}
-
-// CameraInputView with integrated orientation handling
-struct CameraInputView: UIViewRepresentable {
-    let cameraManager: CameraManager
-    private var inputView: UICameraInputView = .init()
-
-    init(_ cameraManager: CameraManager) {
-        self.cameraManager = cameraManager
-    }
-
-    func makeUIView(context: Context) -> some UIView {
-        inputView.cameraManager = cameraManager
-        return inputView.view
-    }
-
-    func updateUIView(_ uiView: UIViewType, context: Context) {}
-}
-
-// UICameraInputView with integrated orientation handling
-fileprivate class UICameraInputView: UIViewController {
-    var cameraManager: CameraManager!
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        setupCameraManager()
-    }
-
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        cameraManager.cameraLayer.frame = view.bounds
-    }
-
-    private func setupCameraManager() {
-        do {
-            try self.cameraManager.setup(in: view)
-        } catch {}
     }
 }
 
