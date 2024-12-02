@@ -43,6 +43,7 @@ class CameraManager: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
     }
     
     @objc func deviceOrientationDidChange() {
+        guard UIDevice.current.orientation.isLandscape else { return }
         updatePreviewOrientation()
     }
 
@@ -50,18 +51,7 @@ class CameraManager: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
         guard let connection = cameraLayer?.connection else { return }
         guard connection.isVideoOrientationSupported else { return }
 
-        switch UIDevice.current.orientation {
-        case .portrait:
-            connection.videoOrientation = .portrait
-        case .landscapeLeft:
-            connection.videoOrientation = .landscapeRight
-        case .landscapeRight:
-            connection.videoOrientation = .landscapeLeft
-        case .portraitUpsideDown:
-            connection.videoOrientation = .portraitUpsideDown
-        default:
-            connection.videoOrientation = .portrait
-        }
+        connection.videoOrientation = .landscapeRight
 
         DispatchQueue.main.async {
             self.cameraLayer?.frame = UIScreen.main.bounds
@@ -322,21 +312,7 @@ extension UIDeviceOrientation {
             return 0
         }
     }
-    func deviceOrientationDidChange() {
-        guard UIDevice.current.orientation.isLandscape else { return }
-        updatePreviewOrientation()
-    }
 
-    func updatePreviewOrientation() {
-        guard let connection = cameraLayer?.connection else { return }
-        guard connection.isVideoOrientationSupported else { return }
-
-        connection.videoOrientation = .landscapeRight
-
-        DispatchQueue.main.async {
-            self.cameraLayer?.frame = UIScreen.main.bounds
-        }
-    }
     var videoOrientation: AVCaptureVideoOrientation? {
         switch self {
         case .portrait:
