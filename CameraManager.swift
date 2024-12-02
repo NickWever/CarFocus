@@ -322,7 +322,21 @@ extension UIDeviceOrientation {
             return 0
         }
     }
+    func deviceOrientationDidChange() {
+        guard UIDevice.current.orientation.isLandscape else { return }
+        updatePreviewOrientation()
+    }
 
+    func updatePreviewOrientation() {
+        guard let connection = cameraLayer?.connection else { return }
+        guard connection.isVideoOrientationSupported else { return }
+
+        connection.videoOrientation = .landscapeRight
+
+        DispatchQueue.main.async {
+            self.cameraLayer?.frame = UIScreen.main.bounds
+        }
+    }
     var videoOrientation: AVCaptureVideoOrientation? {
         switch self {
         case .portrait:
