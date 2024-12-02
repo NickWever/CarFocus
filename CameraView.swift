@@ -2,6 +2,37 @@ import SwiftUI
 import AVFoundation
 import UIKit
 
+enum CameraPosition {
+    case front
+    case back
+}
+
+enum CameraFlashMode {
+    case on
+    case off
+    case auto
+    
+    func get() -> AVCaptureDevice.FlashMode {
+        switch self {
+        case .on: return .on
+        case .off: return .off
+        case .auto: return .auto
+        }
+    }
+}
+
+enum CameraTorchMode {
+    case on
+    case off
+    
+    func get() -> AVCaptureDevice.TorchMode {
+        switch self {
+        case .on: return .on
+        case .off: return .off
+        }
+    }
+}
+
 struct CameraView: UIViewControllerRepresentable {
     @Binding var geselecteerdeFoto: UIImage?
     @Binding var isCameraActive: Bool
@@ -139,6 +170,7 @@ struct CameraView: UIViewControllerRepresentable {
                 }
             }
         }
+
         @objc func adjustExposure(_ sender: UISlider) {
             if let device = AVCaptureDevice.default(for: .video) {
                 do {
@@ -256,28 +288,6 @@ struct CameraView: UIViewControllerRepresentable {
     }
 }
 
-extension UIDeviceOrientation {
-    var rotationAngle: CGFloat {
-        switch self {
-        case .portrait: return 0
-        case .landscapeLeft: return 90
-        case .landscapeRight: return -90
-        case .portraitUpsideDown: return 180
-        default: return 0
-        }
-    }
-}
-
-    var videoOrientation: AVCaptureVideoOrientation? {
-        switch self {
-        case .portrait: return .portrait
-        case .landscapeLeft: return .landscapeRight
-        case .landscapeRight: return .landscapeLeft
-        case .portraitUpsideDown: return .portraitUpsideDown
-        default: return nil
-        }
-    }
-
 
 extension UIImage {
     func fixedOrientation() -> UIImage {
@@ -290,9 +300,3 @@ extension UIImage {
         return normalizedImage
     }
 }
-
-enum CameraPosition {
-    case front
-    case back
-}
-
