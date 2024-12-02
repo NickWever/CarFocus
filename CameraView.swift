@@ -109,19 +109,9 @@ struct CameraView: UIViewControllerRepresentable {
 
         func updatePreviewOrientation() {
             guard let connection = previewLayer?.connection else { return }
-            guard connection.isVideoOrientationSupported else { return }
 
-            switch UIDevice.current.orientation {
-            case .portrait:
-                connection.videoOrientation = .portrait
-            case .landscapeLeft:
+            if connection.isVideoOrientationSupported {
                 connection.videoOrientation = .landscapeRight
-            case .landscapeRight:
-                connection.videoOrientation = .landscapeLeft
-            case .portraitUpsideDown:
-                connection.videoOrientation = .portraitUpsideDown
-            default:
-                connection.videoOrientation = .portrait
             }
 
             DispatchQueue.main.async {
