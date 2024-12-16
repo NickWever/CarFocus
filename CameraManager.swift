@@ -251,6 +251,7 @@ class CameraManager: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
     private func handlePermissionError() {
         // Handle the permission error appropriately
     }
+    
     func configureOutput(_ output: AVCapturePhotoOutput?) {
         // Add any necessary configuration for the photo output
         if #available(iOS 16.0, *) {
@@ -268,6 +269,21 @@ class CameraManager: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
         switch outputType {
         case .photo:
             return photoOutput
+        }
+    }
+
+    func updatePreviewOrientation() {
+        guard let connection = cameraLayer?.connection else { return }
+        guard connection.isVideoOrientationSupported else { return }
+
+        if let orientation = UIDevice.current.orientation.videoOrientation {
+            connection.videoOrientation = orientation
+        } else {
+            connection.videoOrientation = .portrait
+        }
+
+        DispatchQueue.main.async {
+            self.cameraLayer.frame = UIScreen.main.bounds
         }
     }
 }
@@ -329,19 +345,5 @@ private extension GridView {
         shapeLayer.frame = bounds
         shapeLayer.fillColor = nil
         return shapeLayer
-    }
-}
-func updatePreviewOrientation() {
-    guard let connection = cameraLayer?.connection else { return }
-    guard connection.isVideoOrientationSupported else { return }
-
-    if let orientation = UIDevice.current.orientation.videoOrientation {
-        connection.videoOrientation = orientation
-    } else {
-        connection.videoOrientation = .portrait
-    }
-
-    DispatchQueue.main.async {
-        self.cameraLayer?.frame = UIScreen.main.bounds
     }
 }
