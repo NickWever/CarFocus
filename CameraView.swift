@@ -39,7 +39,7 @@ struct CameraView: UIViewControllerRepresentable {
     var voltooiFoto: (UIImage) -> Void
     @Binding var huidigeFotoNaam: String
 
-    class Coordinator: NSObject, AVCapturePhotoCaptureDelegate {
+    class Coordinator: NSObject, AVCapturePhotoCaptureDelegate, UIGestureRecognizerDelegate {
         var parent: CameraView
         var captureSession: AVCaptureSession?
         var photoOutput: AVCapturePhotoOutput?
@@ -101,6 +101,11 @@ struct CameraView: UIViewControllerRepresentable {
             }
 
             updatePreviewOrientation()
+
+            // Add pinch gesture recognizer for zoom
+            let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+            pinchGesture.delegate = self
+            view.addGestureRecognizer(pinchGesture)
         }
 
         @objc func deviceOrientationDidChange() {
@@ -110,8 +115,8 @@ struct CameraView: UIViewControllerRepresentable {
         func updatePreviewOrientation() {
             guard let connection = previewLayer?.connection else { return }
 
-            if connection.isVideoOrientationSupported {
-                connection.videoOrientation = .landscapeRight
+            if connection.isVideoOrientationSupported, let orientation = UIDevice.current.orientation.videoOrientation {
+                connection.videoOrientation = orientation
             }
 
             DispatchQueue.main.async {
@@ -202,6 +207,22 @@ struct CameraView: UIViewControllerRepresentable {
 
             captureSession.commitConfiguration()
         }
+
+        @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+            guard let device = AVCaptureDevice.default(for: .video) else { return }
+            if gesture.state == .changed {
+                let maxZoomFactor = device.activeFormat.videoMaxZoomFactor
+                let pinchVelocityDividerFactor: CGFloat = 10.0
+                do {
+                    try device.lockForConfiguration()
+                    let desiredZoomFactor = device.videoZoomFactor + atan2(gesture.velocity, pinchVelocityDividerFactor)
+                    device.videoZoomFactor = max(1.0, min(desiredZoomFactor, maxZoomFactor))
+                    device.unlockForConfiguration()
+                } catch {
+                    print("❌ Error adjusting zoom: \(error)")
+                }
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -260,10 +281,10 @@ struct CameraView: UIViewControllerRepresentable {
             flashButton.heightAnchor.constraint(equalToConstant: 40),
             flashButton.trailingAnchor.constraint(equalTo: viewController.view.trailingAnchor, constant: -20),
             flashButton.topAnchor.constraint(equalTo: viewController.view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            
+
             switchButton.widthAnchor.constraint(equalToConstant: 40),
             switchButton.heightAnchor.constraint(equalToConstant: 40),
-            switchButton.leadingAnchor.constraint(equalTo: viewController.view.leadingAnchor, constant: -20),
+            switchButton.leadingAnchor.constraint(equalTo: viewController.view.leadingAnchor, constant: 20),
             switchButton.topAnchor.constraint(equalTo: viewController.view.safeAreaLayoutGuide.topAnchor, constant: 20),
 
             exposureSlider.leadingAnchor.constraint(equalTo: viewController.view.leadingAnchor, constant: 20),
@@ -285,15 +306,20 @@ struct CameraView: UIViewControllerRepresentable {
 }
 
 
-extension UIImage {
-    func fixedOrientation() -> UIImage {
-        guard imageOrientation != .up else { return self }
 
-        UIGraphicsBeginImageContextWithOptions(size, false, scale)
-        draw(in: CGRect(origin: .zero, size: size))
-        let normalizedImage = UIGraphicsGetImageFromCurrentImageContext() ?? self
-        UIGraphicsEndImageContext()
-        return normalizedImage
+extension UIDeviceOrientation {
+    var videoOrientation: AVCaptureVideoOrientation? {
+        switch self {
+        case .portrait:
+            return .portrait
+        case .landscapeLeft:
+            return .landscapeRight
+        case .landscapeRight:
+            return .landscapeLeft
+        case .portraitUpsideDown:
+            return .portraitUpsideDown
+        default:
+            return nil
+        }
     }
 }
-
