@@ -2,7 +2,6 @@ import SwiftUI
 import AVFoundation
 import UIKit
 
-// CameraManager with device orientation handling
 class CameraManager: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
     // MARK: Devices
     private var frontCamera: AVCaptureDevice?
@@ -27,35 +26,12 @@ class CameraManager: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
     @Published private(set) var flashMode: CameraFlashMode = .off
     @Published private(set) var torchMode: CameraTorchMode = .off
 
-    // MARK: Orientation Handling
     override init() {
         super.init()
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(deviceOrientationDidChange),
-            name: UIDevice.orientationDidChangeNotification,
-            object: nil
-        )
     }
 
     deinit {
         NotificationCenter.default.removeObserver(self)
-    }
-    
-    @objc func deviceOrientationDidChange() {
-        guard UIDevice.current.orientation.isLandscape else { return }
-        updatePreviewOrientation()
-    }
-
-    func updatePreviewOrientation() {
-        guard let connection = cameraLayer?.connection else { return }
-        guard connection.isVideoOrientationSupported else { return }
-
-        connection.videoOrientation = .landscapeRight
-
-        DispatchQueue.main.async {
-            self.cameraLayer?.frame = UIScreen.main.bounds
-        }
     }
 
     // Setup methods
@@ -150,7 +126,7 @@ class CameraManager: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
         }
         captureSession.addOutput(output)
     }
-    
+
     func initialiseCameraGridView(_ cameraView: UIView) {
         cameraGridView = .init()
         cameraGridView.addAsSubview(to: cameraView)
@@ -296,39 +272,6 @@ class CameraManager: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate {
     }
 }
 
-// UIDeviceOrientation extensions
-extension UIDeviceOrientation {
-    var rotationAngle: CGFloat {
-        switch self {
-        case .portrait:
-            return 0
-        case .landscapeLeft:
-            return 90
-        case .landscapeRight:
-            return -90
-        case .portraitUpsideDown:
-            return 180
-        default:
-            return 0
-        }
-    }
-
-    var videoOrientation: AVCaptureVideoOrientation? {
-        switch self {
-        case .portrait:
-            return .portrait
-        case .landscapeLeft:
-            return .landscapeRight
-        case .landscapeRight:
-            return .landscapeLeft
-        case .portraitUpsideDown:
-            return .portraitUpsideDown
-        default:
-            return nil
-        }
-    }
-}
-
 // GridView class and extensions
 class GridView: UIView {}
 
@@ -386,5 +329,19 @@ private extension GridView {
         shapeLayer.frame = bounds
         shapeLayer.fillColor = nil
         return shapeLayer
+    }
+}
+func updatePreviewOrientation() {
+    guard let connection = cameraLayer?.connection else { return }
+    guard connection.isVideoOrientationSupported else { return }
+
+    if let orientation = UIDevice.current.orientation.videoOrientation {
+        connection.videoOrientation = orientation
+    } else {
+        connection.videoOrientation = .portrait
+    }
+
+    DispatchQueue.main.async {
+        self.cameraLayer?.frame = UIScreen.main.bounds
     }
 }
